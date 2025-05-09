@@ -19,8 +19,8 @@ time.sleep(3)
 csv_file = "lai_suat_qua_dem.csv"
 header_written = os.path.exists(csv_file) and os.path.getsize(csv_file) > 0
 
-start_date = datetime.date(2020, 1, 1)
-end_date = datetime.date(2020, 5, 31)
+start_date = datetime.date(2020, 6, 1)
+end_date = datetime.date(2020, 12, 31)
 current_date = start_date
 
 while current_date <= end_date:
