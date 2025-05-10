@@ -24,7 +24,7 @@ All crawled data is saved as CSV files in the `data/` directory:
 ## Installation
 1. Clone this repository:
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/mvansan/VN-JP-MacroIndicators-Crawler.git
    cd VN-JP-MacroIndicators-Crawler
    ```
 2. Install dependencies:
@@ -48,6 +48,7 @@ The output CSV files will be saved in the `data/` directory.
 - Ensure you have a stable internet connection and Google Chrome installed.
 - Crawlers use Selenium WebDriver and may take several minutes to complete depending on the data range.
 - For best results, use the latest version of Chrome and ChromeDriver.
+- Sometimes, the Investing.com website may fail to load or respond. If this happens, please close the browser window and rerun the script.
 
 ## License
 This project is for research and educational purposes only.
