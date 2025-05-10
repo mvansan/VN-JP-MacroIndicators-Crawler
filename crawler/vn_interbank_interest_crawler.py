@@ -16,7 +16,7 @@ time.sleep(5)
 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 time.sleep(3)
 
-csv_file = "lai_suat_qua_dem.csv"
+csv_file = "data/vn_interbank_interest.csv"
 header_written = os.path.exists(csv_file) and os.path.getsize(csv_file) > 0
 
 start_date = datetime.date(2025, 1, 1)
