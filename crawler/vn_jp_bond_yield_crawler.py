@@ -41,7 +41,8 @@ start_date_input.clear()
 start_date_input.send_keys('01/02/2020')
 time.sleep(2)
 
-apply_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Apply')]")
+# apply_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Áp dụng')]") #use for vietnam
+apply_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Apply')]") #use for japan
 driver.execute_script("arguments[0].click();", apply_button)
 time.sleep(10)
 
