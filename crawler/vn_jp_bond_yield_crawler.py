@@ -12,7 +12,8 @@ options = Options()
 options.add_argument("--start-maximized")
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-url = "https://vn.investing.com/rates-bonds/vietnam-5-year-bond-yield-historical-data"
+# url = "https://vn.investing.com/rates-bonds/vietnam-5-year-bond-yield-historical-data" #use for vietnam
+url = "https://www.investing.com/rates-bonds/japan-5-year-bond-yield-historical-data" #use for japan
 driver.get(url)
 time.sleep(5)  
 
@@ -40,12 +41,13 @@ start_date_input.clear()
 start_date_input.send_keys('01/02/2020')
 time.sleep(2)
 
-apply_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Áp dụng')]")
+apply_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Apply')]")
 driver.execute_script("arguments[0].click();", apply_button)
 time.sleep(10)
 
 rows = driver.find_elements(By.CSS_SELECTOR, 'table tr')
-with open('data/vn_bond_yield.csv', 'w', newline='', encoding='utf-8') as f:
+# with open('data/vn_bond_yield.csv', 'w', newline='', encoding='utf-8') as f: #use for vietnam
+with open('data/jp_bond_yield.csv', 'w', newline='', encoding='utf-8') as f: #use for japan
     writer = csv.writer(f)
     writer.writerow(['date', 'yield'])
     last_date = None
@@ -60,7 +62,7 @@ with open('data/vn_bond_yield.csv', 'w', newline='', encoding='utf-8') as f:
             print(date_val, percent_val)
             last_date = date_val
             driver.execute_script('arguments[0].scrollIntoView({block: "end"});', row)
-            time.sleep(0.2)
+            time.sleep(0.15)
             if date_val.endswith('01/01/2020'):
                 break
         except Exception as e:
