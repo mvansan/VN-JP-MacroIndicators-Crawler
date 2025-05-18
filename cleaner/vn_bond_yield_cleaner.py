@@ -11,7 +11,7 @@ def clean_vn_bond():
     
     df = df.sort_values('date')
     
-    start_date = pd.Timestamp('2020-01-01')
+    start_date = df['date'].min()
     end_date = df['date'].max()
     date_range = pd.date_range(start=start_date, end=end_date, freq='D')
     
@@ -25,3 +25,4 @@ def clean_vn_bond():
     
 if __name__ == "__main__":
     clean_vn_bond() 
+    
