@@ -3,24 +3,23 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 import time
 import csv
 import os
 import sys
 import subprocess
 import pandas as pd
-from datetime import datetime, timedelta
 
-def get_last_available_date():
+def get_first_date_in_csv():
     try:
-        df = pd.read_csv("data/raw/vn_bond_yield.csv")
-        df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y')
-        last_date = df['date'].max()
-        return last_date + pd.Timedelta(days=1)
-    except:
-        return pd.to_datetime('01/01/2020', format='%d/%m/%Y')
+        with open("data/raw/vn_bond_yield.csv", "r", encoding="utf-8") as f:
+            next(f)
+            first_line = f.readline()
+            if first_line:
+                return first_line.strip().split(",")[0]
+    except Exception:
+        pass
+    return None
 
 def run_cleaner():
     subprocess.run([sys.executable, "cleaner/vn_bond_yield_cleaner.py"])
@@ -35,48 +34,13 @@ def crawl_vn_bond_yield():
 
     url = "https://vn.investing.com/rates-bonds/vietnam-5-year-bond-yield-historical-data"
     driver.get(url)
-    time.sleep(5)  
-
+    time.sleep(5)
     driver.execute_script("window.scrollBy(0, 500);")
     time.sleep(5)
 
-    date_pickers = driver.find_elements(By.CSS_SELECTOR, '.shadow-select')
-    date_picker = None
-    for el in date_pickers:
-        try:
-            if 'gap-3.5' in el.get_attribute('class') and '-' in el.text:
-                date_picker = el
-                break
-        except Exception:
-            continue
-    if date_picker is None:
-        raise Exception('Not found date picker')
-    date_picker.click()
+    stop_date = get_first_date_in_csv()
+    print(f"Stop crawling when reaching date: {stop_date}")
 
-    wait = WebDriverWait(driver, 20)
-    start_date_input = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='date' or @type='text']")))
-    print('Date input value:', start_date_input.get_attribute('value'))
-
-    start_date = get_last_available_date()
-    current_date = datetime.now()
-    
-    if start_date > current_date:
-        print("No new data to crawl")
-        driver.quit()
-        return False
-
-    print(f"Starting crawl from {start_date.strftime('%d/%m/%Y')} to {current_date.strftime('%d/%m/%Y')}")
-
-    # Định dạng đúng cho input text DD/MM/YYYY
-    start_date_input.clear()
-    start_date_input.send_keys(start_date.strftime('%d/%m/%Y'))
-    time.sleep(2)
-
-    apply_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Áp dụng')]")
-    driver.execute_script("arguments[0].click();", apply_button)
-    time.sleep(10)
-
-    # Ensure data directory exists
     os.makedirs('data/raw', exist_ok=True)
 
     try:
@@ -86,8 +50,7 @@ def crawl_vn_bond_yield():
         existing_data = []
 
     rows = driver.find_elements(By.CSS_SELECTOR, 'table tr')
-    new_data_found = False
-    results = []
+    new_data = []
 
     for i in range(1, len(rows)):
         try:
@@ -96,14 +59,11 @@ def crawl_vn_bond_yield():
             date_val = date_td.get_attribute('datetime')
             percent_td = row.find_elements(By.CSS_SELECTOR, 'td')[-1]
             percent_val = percent_td.text.strip()
-            
-            # Convert date_val to datetime for comparison
-            date_val_dt = pd.to_datetime(date_val, format='%d/%m/%Y')
-            if date_val_dt >= start_date and not any(entry[0] == date_val for entry in existing_data):
-                new_data_found = True
-                print(f"Found new data for {date_val}: {percent_val}")
-                results.append([date_val, percent_val])
-            
+            if date_val == stop_date:
+                print(f"Reached stop date {stop_date}, stopping crawl.")
+                break
+            print(f"Found new data for {date_val}: {percent_val}")
+            new_data.append([date_val, percent_val])
             driver.execute_script('arguments[0].scrollIntoView({block: "end"});', row)
             time.sleep(0.15)
         except Exception as e:
@@ -112,20 +72,16 @@ def crawl_vn_bond_yield():
 
     driver.quit()
 
-    if not new_data_found:
+    if not new_data:
         print("\nNo new data found. Stopping process.")
         return False
 
     print("\nSaving new data...")
-    
-    all_data = existing_data + results
-    all_data.sort(key=lambda x: datetime.strptime(x[0], "%d/%m/%Y"))
-    
+    all_data = new_data + existing_data
     with open("data/raw/vn_bond_yield.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(['date', 'yield'])
         writer.writerows(all_data)
-
     print("Data saved successfully!")
     return True
 
