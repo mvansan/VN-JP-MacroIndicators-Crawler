@@ -1,11 +1,8 @@
 import boto3
-from dotenv import load_dotenv
 import os
 from datetime import datetime
 import pandas as pd
 import tempfile
-
-load_dotenv()
 
 def get_s3_key(date_str):
     date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -59,11 +56,7 @@ def upload_vn_interbank_data(df, date_str, s3_client, bucket_name):
 
 def process_and_upload_data():
     try:
-        session = boto3.Session(
-            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-            region_name=os.getenv('AWS_REGION', 'ap-southeast-1')
-        )
+        session = boto3.Session()
         s3 = session.client("s3")
         bucket_name = "yen-vnd-rate-forcast-1205"
 
