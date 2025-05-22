@@ -26,7 +26,7 @@ jobs:
         pip install -r requirements.txt
         
     - name: Run bond yield crawler
-      run: python crawlers/bond_yield_crawler.py
+      run: python crawler/bond_yield_crawler.py
       
     - name: Commit changes if new data
       run: |

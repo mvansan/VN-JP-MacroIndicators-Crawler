@@ -26,7 +26,7 @@ jobs:
         pip install -r requirements.txt
         
     - name: Run CPI crawler
-      run: python crawlers/cpi_crawler.py
+      run: python crawler/cpi_crawler.py
       
     - name: Commit changes if new data
       run: |
