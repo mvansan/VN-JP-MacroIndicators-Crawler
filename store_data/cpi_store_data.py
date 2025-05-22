@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 import pandas as pd
 import tempfile
+import re
 
 def get_s3_key(date_str):
     date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -13,7 +14,16 @@ def get_s3_key(date_str):
     else:
         return f"uploads/cpi_data/{date.strftime('%d-%m-%Y')}.csv"
 
-def get_latest_s3_data(s3_client, bucket_name):
+def extract_month_from_key(key):
+    m = re.search(r'cpi_data/(\d{2}-\d{2}-\d{4})\\.csv', key)
+    if not m:
+        m = re.search(r'cpi_data/(\d{2}-\d{2}-\d{4})\.csv', key)
+    if m:
+        dt = datetime.strptime(m.group(1), "%d-%m-%Y")
+        return dt.replace(day=1)
+    return None
+
+def get_latest_cloud_month(s3_client, bucket_name):
     try:
         response = s3_client.list_objects_v2(
             Bucket=bucket_name,
@@ -21,14 +31,17 @@ def get_latest_s3_data(s3_client, bucket_name):
         )
         if 'Contents' not in response:
             return None
-        latest_file = max(response['Contents'], key=lambda x: x['LastModified'])
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp:
-            s3_client.download_file(bucket_name, latest_file['Key'], tmp.name)
-            df = pd.read_csv(tmp.name)
-            os.unlink(tmp.name)
-            return df
+        max_month = None
+        for obj in response['Contents']:
+            key = obj['Key']
+            if key.endswith('history.csv'):
+                continue
+            month = extract_month_from_key(key)
+            if month and (max_month is None or month > max_month):
+                max_month = month
+        return max_month
     except Exception as e:
-        print(f"Error getting latest S3 data: {str(e)}")
+        print(f"Error getting latest cloud month: {str(e)}")
         return None
 
 def upload_cpi_data(df, date_str, s3_client, bucket_name):
@@ -48,14 +61,13 @@ def process_and_upload_data():
         session = boto3.Session()
         s3 = session.client("s3")
         bucket_name = "yen-vnd-rate-forcast-1205"
-        latest_s3_data = get_latest_s3_data(s3, bucket_name)
+        latest_cloud_month = get_latest_cloud_month(s3, bucket_name)
         data_path = "data/cleaned/cpi_data.csv"
         current_df = pd.read_csv(data_path)
         current_df['date'] = pd.to_datetime(current_df['date'])
-        if latest_s3_data is not None:
-            latest_s3_data['date'] = pd.to_datetime(latest_s3_data['date'])
-            latest_date = latest_s3_data['date'].max()
-            new_data = current_df[current_df['date'] > latest_date]
+        current_df['month'] = current_df['date'].dt.to_period('M')
+        if latest_cloud_month is not None:
+            new_data = current_df[current_df['date'] > latest_cloud_month]
             if new_data.empty:
                 print("No new data to upload")
                 return

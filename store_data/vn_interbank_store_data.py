@@ -15,7 +15,6 @@ def get_s3_key(date_str):
         return f"uploads/vn_interbank_interest/{date.strftime('%d-%m-%Y')}.csv"
 
 def extract_date_from_key(key):
-    # Match pattern uploads/vn_interbank_interest/dd-mm-yyyy.csv
     m = re.search(r'vn_interbank_interest/(\d{2}-\d{2}-\d{4})\\.csv', key)
     if not m:
         m = re.search(r'vn_interbank_interest/(\d{2}-\d{2}-\d{4})\.csv', key)
@@ -65,7 +64,6 @@ def process_and_upload_data():
         session = boto3.Session()
         s3 = session.client("s3")
         bucket_name = "yen-vnd-rate-forcast-1205"
-        # Lấy ngày lớn nhất trên cloud
         latest_cloud_date = get_latest_cloud_date(s3, bucket_name)
         data_path = "data/cleaned/vn_interbank_interest_clean.csv"
         current_df = pd.read_csv(data_path)
