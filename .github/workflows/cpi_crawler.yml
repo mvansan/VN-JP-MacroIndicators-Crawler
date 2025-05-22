@@ -32,7 +32,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add data/raw/cpi_data.csv data/cleaned/cpi_data.csv
+        git add data/raw/vn_cpi.csv data/raw/jp_cpi.csv data/cleaned/cpi_data.csv
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update CPI data [skip ci]" && git push)
         
     - name: Store data to cloud
