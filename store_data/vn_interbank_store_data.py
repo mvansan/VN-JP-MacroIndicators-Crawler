@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 import pandas as pd
 import tempfile
+import re
 
 def get_s3_key(date_str):
     date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -13,29 +14,34 @@ def get_s3_key(date_str):
     else:
         return f"uploads/vn_interbank_interest/{date.strftime('%d-%m-%Y')}.csv"
 
-def get_latest_s3_data(s3_client, bucket_name):
+def extract_date_from_key(key):
+    # Match pattern uploads/vn_interbank_interest/dd-mm-yyyy.csv
+    m = re.search(r'vn_interbank_interest/(\d{2}-\d{2}-\d{4})\\.csv', key)
+    if not m:
+        m = re.search(r'vn_interbank_interest/(\d{2}-\d{2}-\d{4})\.csv', key)
+    if m:
+        return datetime.strptime(m.group(1), "%d-%m-%Y")
+    return None
+
+def get_latest_cloud_date(s3_client, bucket_name):
     try:
-        # Get the latest file from S3
         response = s3_client.list_objects_v2(
             Bucket=bucket_name,
             Prefix="uploads/vn_interbank_interest/"
         )
-        
         if 'Contents' not in response:
             return None
-            
-        # Sort by last modified date
-        latest_file = max(response['Contents'], key=lambda x: x['LastModified'])
-        
-        # Download the file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp:
-            s3_client.download_file(bucket_name, latest_file['Key'], tmp.name)
-            df = pd.read_csv(tmp.name)
-            os.unlink(tmp.name)
-            return df
-            
+        max_date = None
+        for obj in response['Contents']:
+            key = obj['Key']
+            if key.endswith('history.csv'):
+                continue
+            date = extract_date_from_key(key)
+            if date and (max_date is None or date > max_date):
+                max_date = date
+        return max_date
     except Exception as e:
-        print(f"Error getting latest S3 data: {str(e)}")
+        print(f"Error getting latest cloud date: {str(e)}")
         return None
 
 def upload_vn_interbank_data(df, date_str, s3_client, bucket_name):
@@ -59,29 +65,18 @@ def process_and_upload_data():
         session = boto3.Session()
         s3 = session.client("s3")
         bucket_name = "yen-vnd-rate-forcast-1205"
-
-        # Get latest data from S3
-        latest_s3_data = get_latest_s3_data(s3, bucket_name)
-        
-        # Read current data
+        # Lấy ngày lớn nhất trên cloud
+        latest_cloud_date = get_latest_cloud_date(s3, bucket_name)
         data_path = "data/cleaned/vn_interbank_interest_clean.csv"
         current_df = pd.read_csv(data_path)
         current_df['date'] = pd.to_datetime(current_df['date'])
         
-        if latest_s3_data is not None:
-            latest_s3_data['date'] = pd.to_datetime(latest_s3_data['date'])
-            latest_date = latest_s3_data['date'].max()
-            
-            # Only process new data
-            new_data = current_df[current_df['date'] > latest_date]
-            
+        if latest_cloud_date is not None:
+            new_data = current_df[current_df['date'] > latest_cloud_date]
             if new_data.empty:
                 print("No new data to upload")
                 return
-                
             print(f"Found new data from {new_data['date'].min()} to {new_data['date'].max()}")
-            
-            # Process and upload new data
             cutoff_date = datetime(2025, 5, 14)
             historical_data = new_data[new_data['date'].dt.date <= cutoff_date.date()]
             current_data = new_data[new_data['date'].dt.date > cutoff_date.date()]
@@ -93,7 +88,6 @@ def process_and_upload_data():
                 date_str = date.strftime("%Y-%m-%d")
                 upload_vn_interbank_data(group_df, date_str, s3, bucket_name)
         else:
-            # If no data in S3, upload all current data
             cutoff_date = datetime(2025, 5, 14)
             historical_data = current_df[current_df['date'].dt.date <= cutoff_date.date()]
             current_data = current_df[current_df['date'].dt.date > cutoff_date.date()]
