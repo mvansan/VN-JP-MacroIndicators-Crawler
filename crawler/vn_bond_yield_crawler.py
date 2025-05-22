@@ -28,62 +28,84 @@ def run_visualizer():
     subprocess.run([sys.executable, "visualize/vn_bond_yield_visualizer.py"])
 
 def crawl_vn_bond_yield():
-    options = Options()
-    options.add_argument("--start-maximized")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    chrome_options = Options()
+    chrome_options.add_argument('--headless=new')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--start-maximized')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    url = "https://vn.investing.com/rates-bonds/vietnam-5-year-bond-yield-historical-data"
-    driver.get(url)
-    time.sleep(5)
-    driver.execute_script("window.scrollBy(0, 500);")
-    time.sleep(5)
-
-    stop_date = get_first_date_in_csv()
-    print(f"Stop crawling when reaching date: {stop_date}")
-
-    os.makedirs('data/raw', exist_ok=True)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
 
     try:
-        existing_df = pd.read_csv("data/raw/vn_bond_yield.csv")
-        existing_data = existing_df.values.tolist()
-    except:
-        existing_data = []
+        # Set user agent
+        driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+            "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
 
-    rows = driver.find_elements(By.CSS_SELECTOR, 'table tr')
-    new_data = []
+        url = "https://vn.investing.com/rates-bonds/vietnam-5-year-bond-yield-historical-data"
+        driver.get(url)
+        time.sleep(5)
+        driver.execute_script("window.scrollBy(0, 500);")
+        time.sleep(5)
 
-    for i in range(1, len(rows)):
+        stop_date = get_first_date_in_csv()
+        print(f"Stop crawling when reaching date: {stop_date}")
+
+        os.makedirs('data/raw', exist_ok=True)
+
         try:
-            row = rows[i]
-            date_td = row.find_element(By.CSS_SELECTOR, 'td.sticky.left-0 time')
-            date_val = date_td.get_attribute('datetime')
-            percent_td = row.find_elements(By.CSS_SELECTOR, 'td')[-1]
-            percent_val = percent_td.text.strip()
-            if date_val == stop_date:
-                print(f"Reached stop date {stop_date}, stopping crawl.")
-                break
-            print(f"Found new data for {date_val}: {percent_val}")
-            new_data.append([date_val, percent_val])
-            driver.execute_script('arguments[0].scrollIntoView({block: "end"});', row)
-            time.sleep(0.15)
+            existing_df = pd.read_csv("data/raw/vn_bond_yield.csv")
+            existing_data = existing_df.values.tolist()
         except Exception as e:
-            print('Error when crawl row:', e)
-            continue
+            print(f"Error reading existing data: {str(e)}")
+            existing_data = []
 
-    driver.quit()
+        rows = driver.find_elements(By.CSS_SELECTOR, 'table tr')
+        new_data = []
 
-    if not new_data:
-        print("\nNo new data found. Stopping process.")
+        for i in range(1, len(rows)):
+            try:
+                row = rows[i]
+                date_td = row.find_element(By.CSS_SELECTOR, 'td.sticky.left-0 time')
+                date_val = date_td.get_attribute('datetime')
+                percent_td = row.find_elements(By.CSS_SELECTOR, 'td')[-1]
+                percent_val = percent_td.text.strip()
+                if date_val == stop_date:
+                    print(f"Reached stop date {stop_date}, stopping crawl.")
+                    break
+                print(f"Found new data for {date_val}: {percent_val}")
+                new_data.append([date_val, percent_val])
+                driver.execute_script('arguments[0].scrollIntoView({block: "end"});', row)
+                time.sleep(0.15)
+            except Exception as e:
+                print(f'Error when crawl row: {str(e)}')
+                continue
+
+        if not new_data:
+            print("\nNo new data found. Stopping process.")
+            return False
+
+        print("\nSaving new data...")
+        all_data = new_data + existing_data
+        with open("data/raw/vn_bond_yield.csv", "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(['date', 'yield'])
+            writer.writerows(all_data)
+        print("Data saved successfully!")
+        return True
+
+    except Exception as e:
+        print(f"Error during crawling: {str(e)}")
         return False
 
-    print("\nSaving new data...")
-    all_data = new_data + existing_data
-    with open("data/raw/vn_bond_yield.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(['date', 'yield'])
-        writer.writerows(all_data)
-    print("Data saved successfully!")
-    return True
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
     success = crawl_vn_bond_yield()
