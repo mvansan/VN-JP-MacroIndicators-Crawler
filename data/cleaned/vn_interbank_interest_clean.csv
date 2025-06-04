@@ -1976,3 +1976,6 @@ date,overnight_interest_rate,is_original
 2025-05-28,4.08,True
 2025-05-29,3.65,True
 2025-05-30,3.1,True
+2025-05-31,3.1,False
+2025-06-01,3.1,False
+2025-06-02,3.8,True
